@@ -1,7 +1,7 @@
-pandas
-numpy
+streamlit
+google-genai
 sentence-transformers
 faiss-cpu
-google-genai
-streamlit
-ipykernel
+pandas
+numpy
+python-dotenv
