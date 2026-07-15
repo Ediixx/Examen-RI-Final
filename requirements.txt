@@ -1,0 +1,7 @@
+pandas
+numpy
+sentence-transformers
+faiss-cpu
+google-genai
+streamlit
+ipykernel
