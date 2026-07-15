@@ -5,3 +5,5 @@ faiss-cpu
 pandas
 numpy
 python-dotenv
+tenacity
+torchvision
