@@ -103,7 +103,7 @@ def ejecutar_llamada_gemini(prompt, system_instruction):
 
 
 def generate_rag_response(query, contexts):
-    """Fase G: Generación protegida contra cualquier fallo de red o conexión."""
+    """Fase G: Generación fluida en español sin marcas invasivas."""
     if not contexts:
         return "El corpus no contiene información suficiente para responder a esta consulta."
     
@@ -122,20 +122,10 @@ def generate_rag_response(query, contexts):
     
     prompt = f"Context:\n{context_text}\n\nConsulta / Pregunta: {query}\n\nRespuesta (en español):"
     
-    # 🔒 BLINDAJE TOTAL: Captura CUALQUIER error (conexión, timeout, cuota, API caída)
     try:
-        response = ai_client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                system_instruction=system_instruction,
-                temperature=0.0
-            )
-        )
-        return response.text
-    except Exception:
-        # Si la API no se conecta o falla por cualquier motivo, 
-        return "El corpus no contiene información suficiente para responder a esta consulta."
+        return ejecutar_llamada_gemini(prompt, system_instruction)
+    except Exception as e:
+        return f"⚠️ Error al conectar con la API de Gemini: {e}"
 
 # -----------------------------------------------------------------------------
 # 4. MEMORIA Y COMPONENTES VISUALES DEL CHAT
