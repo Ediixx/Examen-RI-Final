@@ -26,7 +26,7 @@ SPYRO_AVATAR = "https://raw.githubusercontent.com/twitter/twemoji/master/assets/
 USER_AVATAR = "👤"
 
 st.title("🐉 Spyro Scientific Assistant")
-st.caption("Sistema Conversacional RAG | FAISS + Re-ranking (Cross-Encoder) + Gemini 2.0 Flash")
+st.caption("Sistema Conversacional RAG | FAISS + Re-ranking (Cross-Encoder) + Gemini 2.5 Flash - Creado por Edison Quizhpe")
 
 # -----------------------------------------------------------------------------
 # 2. CARGA EFICIENTE DE MODELOS Y ARTEFACTOS (Caché)
@@ -104,7 +104,7 @@ def retrieve_and_rerank(query, fetch_k=20, top_n_final=3):
 )
 def ejecutar_llamada_gemini(prompt, system_instruction):
     response = ai_client.models.generate_content(
-        model="gemini-2.0-flash",
+        model="gemini-2.5-flash",
         contents=prompt,
         config=types.GenerateContentConfig(
             system_instruction=system_instruction,
