@@ -15,7 +15,7 @@ from tenacity import retry, wait_exponential, stop_after_attempt, retry_if_excep
 # 1. CONFIGURACIÓN DE PÁGINA Y CREDENCIALES
 # -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Spyro Scientific RAG",
+    page_title="Spyro Scientific RAG - Creado por Edison Quizhpe",
     page_icon="🐉",
     layout="centered"
 )
