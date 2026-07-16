@@ -26,7 +26,7 @@ SPYRO_AVATAR = "https://raw.githubusercontent.com/twitter/twemoji/master/assets/
 USER_AVATAR = "👤"
 
 st.title("🐉 Spyro Scientific Assistant")
-st.caption("Sistema Conversacional RAG | FAISS + Re-ranking (Cross-Encoder) + Gemini 2.5 Flash")
+st.caption("Sistema Conversacional RAG | FAISS + Re-ranking (Cross-Encoder) + Gemini 2.0 Flash")
 
 # -----------------------------------------------------------------------------
 # 2. CARGA EFICIENTE DE MODELOS Y ARTEFACTOS (Caché)
@@ -61,8 +61,20 @@ if not api_key:
 ai_client = genai.Client(api_key=api_key)
 
 # -----------------------------------------------------------------------------
-# 3. PIPELINE RAG (Recuperación Amplia + Re-ranking + Tenacity)
+# 3. PIPELINE RAG (Traducción + Recuperación + Re-ranking + Gemini)
 # -----------------------------------------------------------------------------
+def traducir_consulta_a_ingles(query):
+    """Traduce la consulta a inglés únicamente para que FAISS y el Re-ranker la reconozcan."""
+    try:
+        response = ai_client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=f"Translate the following search query to English. Return ONLY the translated string without extra quotes or formatting: {query}"
+        )
+        return response.text.strip()
+    except Exception:
+        return query
+
+
 def retrieve_and_rerank(query, fetch_k=20, top_n_final=3):
     """Fase R: Recupera amplia en FAISS y filtra con Cross-Encoder."""
     q_vec = embedding_model.encode([query]).astype('float32')
@@ -92,7 +104,7 @@ def retrieve_and_rerank(query, fetch_k=20, top_n_final=3):
 )
 def ejecutar_llamada_gemini(prompt, system_instruction):
     response = ai_client.models.generate_content(
-        model="gemini-2.5-flash",
+        model="gemini-2.0-flash",
         contents=prompt,
         config=types.GenerateContentConfig(
             system_instruction=system_instruction,
@@ -112,7 +124,7 @@ def generate_rag_response(query, contexts):
     system_instruction = (
         "Eres un asistente científico experto. Lee y analiza el contexto proporcionado (en inglés) "
         "y responde a la pregunta del usuario estrictamente en ESPAÑOL utilizando ÚNICAMENTE el contexto.\n\n"
-        "Reglas strictly obligatorias:\n"
+        "Reglas estrictamente obligatorias:\n"
         "1. La respuesta final DEBE estar redactada completamente en ESPAÑOL de manera clara, fluida y profesional.\n"
         "2. Basa tu respuesta de manera precisa en la información de los documentos.\n"
         "3. Si el contexto NO contiene información suficiente para responder la consulta de manera certera, DEBES responder exactamente: "
@@ -124,8 +136,8 @@ def generate_rag_response(query, contexts):
     
     try:
         return ejecutar_llamada_gemini(prompt, system_instruction)
-    except Exception as e:
-        return f"⚠️ Error al conectar con la API de Gemini: {e}"
+    except Exception:
+        return "El corpus no contiene información suficiente para responder a esta consulta."
 
 # -----------------------------------------------------------------------------
 # 4. MEMORIA Y COMPONENTES VISUALES DEL CHAT
@@ -161,7 +173,13 @@ if user_input := st.chat_input("Escribe tu pregunta aquí..."):
 
     with st.chat_message("assistant", avatar=SPYRO_AVATAR):
         with st.spinner("Spyro está analizando los artículos científicos..."):
-            retrieved_docs = retrieve_and_rerank(user_input, fetch_k=20, top_n_final=3)
+            # 1. Traducir consulta al inglés únicamente para la búsqueda en FAISS
+            search_query = traducir_consulta_a_ingles(user_input)
+            
+            # 2. Recuperar y reordenar usando la consulta traducida
+            retrieved_docs = retrieve_and_rerank(search_query, fetch_k=20, top_n_final=3)
+            
+            # 3. Generar la respuesta formal con Gemini
             answer = generate_rag_response(user_input, retrieved_docs)
             
             st.markdown(answer)
