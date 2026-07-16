@@ -112,7 +112,7 @@ def generate_rag_response(query, contexts):
     system_instruction = (
         "Eres un asistente científico experto. Lee y analiza el contexto proporcionado (en inglés) "
         "y responde a la pregunta del usuario estrictamente en ESPAÑOL utilizando ÚNICAMENTE el contexto.\n\n"
-        "Reglas estrictamente obligatorias:\n"
+        "Reglas strictly obligatorias:\n"
         "1. La respuesta final DEBE estar redactada completamente en ESPAÑOL de manera clara, fluida y profesional.\n"
         "2. Basa tu respuesta de manera precisa en la información de los documentos.\n"
         "3. Si el contexto NO contiene información suficiente para responder la consulta de manera certera, DEBES responder exactamente: "
