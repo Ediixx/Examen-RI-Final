@@ -26,7 +26,7 @@ SPYRO_AVATAR = "https://raw.githubusercontent.com/twitter/twemoji/master/assets/
 USER_AVATAR = "👤"
 
 st.title("🐉 Spyro Scientific Assistant")
-st.caption("Sistema Conversacional RAG | FAISS + Re-ranking (Cross-Encoder) + Gemini 2.5 Flash")
+st.caption("Sistema Conversacional RAG | FAISS + Re-ranking (Cross-Encoder) + Gemini 2.0 Flash")
 
 # -----------------------------------------------------------------------------
 # 2. CARGA EFICIENTE DE MODELOS Y ARTEFACTOS (Caché)
@@ -61,8 +61,20 @@ if not api_key:
 ai_client = genai.Client(api_key=api_key)
 
 # -----------------------------------------------------------------------------
-# 3. PIPELINE RAG (Recuperación Amplia + Re-ranking + Tenacity)
+# 3. PIPELINE RAG (Traducción + Recuperación Amplia + Re-ranking + Gemini)
 # -----------------------------------------------------------------------------
+def traducir_consulta_a_ingles(query):
+    """Traduce la consulta al inglés para realizar la búsqueda vectorial exacta en FAISS."""
+    try:
+        response = ai_client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=f"Translate the following search query to English. Return ONLY the translated string without extra quotes or formatting: {query}"
+        )
+        return response.text.strip().replace('"', '').replace("'", "")
+    except Exception:
+        return query
+
+
 def retrieve_and_rerank(query, fetch_k=20, top_n_final=3):
     """Fase R: Recupera amplia en FAISS y filtra con Cross-Encoder."""
     q_vec = embedding_model.encode([query]).astype('float32')
@@ -92,7 +104,7 @@ def retrieve_and_rerank(query, fetch_k=20, top_n_final=3):
 )
 def ejecutar_llamada_gemini(prompt, system_instruction):
     response = ai_client.models.generate_content(
-        model="gemini-2.5-flash",
+        model="gemini-2.0-flash",
         contents=prompt,
         config=types.GenerateContentConfig(
             system_instruction=system_instruction,
@@ -110,16 +122,15 @@ def generate_rag_response(original_query, search_query, contexts):
     context_text = "\n\n".join([f"Documento {i+1}:\n{doc['text_to_embed']}" for i, doc in enumerate(contexts)])
     
     system_instruction = (
-        "Eres Spyro, un asistente científico experto. Lee el contexto (en inglés) "
-        "y responde a la consulta del usuario estrictamente en ESPAÑOL.\n\n"
-        "Instrucciones clave:\n"
-        "1. La respuesta DEBE estar redactada completamente en ESPAÑOL de manera clara, fluida, natural y profesional.\n"
-        "2. Basa tu respuesta en la información de los documentos del contexto.\n"
-        "3. Si los documentos del contexto contienen la respuesta a la consulta (aunque el contexto esté en inglés), "
-        "explícala con detalle en español.\n"
-        "4. Únicamente si el contexto NO aborda en absoluto el tema consultado, responde exactamente: "
-        "'El corpus no contiene información suficiente para responder a esta consulta.'"
-    )
+    "Eres Spyro, un asistente científico experto. Lee el contexto (en inglés) "
+    "y analiza la consulta del usuario (que estará redactada en ESPAÑOL o INGLES).\n\n"
+    "Instrucciones clave:\n"
+    "1. La respuesta DEBE estar redactada completamente en ESPAÑOL de manera clara, fluida, natural y profesional.\n"
+    "2. Comprende la consulta del usuario en español, compárala con las evidencias en inglés y explica la respuesta con detalle en español.\n"
+    "3. Basa tu respuesta de manera precisa en la información de los documentos del contexto.\n"
+    "4. Únicamente si el contexto NO aborda en absoluto el tema consultado, responde exactamente: "
+    "'El corpus no contiene información suficiente para responder a esta consulta.'"
+)
     
     prompt = (
         f"Contexto (Documentos en inglés):\n{context_text}\n\n"
@@ -160,6 +171,9 @@ for message in st.session_state.messages:
 # -----------------------------------------------------------------------------
 # 5. ENTRADA DE USUARIO Y CICLO DE CONVERSACIÓN
 # -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# 5. ENTRADA DE USUARIO Y CICLO DE CONVERSACIÓN
+# -----------------------------------------------------------------------------
 if user_input := st.chat_input("Escribe tu pregunta aquí..."):
     st.session_state.messages.append({"role": "user", "content": user_input})
     with st.chat_message("user", avatar=USER_AVATAR):
@@ -167,19 +181,34 @@ if user_input := st.chat_input("Escribe tu pregunta aquí..."):
 
     with st.chat_message("assistant", avatar=SPYRO_AVATAR):
         with st.spinner("Spyro está analizando los artículos científicos..."):
-            retrieved_docs = retrieve_and_rerank(user_input, fetch_k=20, top_n_final=3)
-            answer = generate_rag_response(user_input, retrieved_docs)
-            
+            # 1. Traducir la consulta al inglés para la búsqueda en FAISS
+            search_query = traducir_consulta_a_ingles(user_input)
+
+            # 2. Recuperar de FAISS + Re-ranker usando la consulta traducida
+            retrieved_docs = retrieve_and_rerank(
+                search_query, fetch_k=20, top_n_final=3
+            )
+
+            # 3. Generar respuesta pasando los 3 argumentos en orden
+            answer = generate_rag_response(user_input, search_query, retrieved_docs)
+
             st.markdown(answer)
-            
+
             if retrieved_docs and "El corpus no contiene" not in answer:
                 with st.expander("📚 Ver Evidencias Científicas Consultadas"):
                     for idx, doc in enumerate(retrieved_docs):
-                        st.write(f"**[{idx+1}] {doc.get('title', 'Sin título')}** (Relevancia: {doc['rerank_score']*100:.2f}%)")
-                        st.caption(f"{doc.get('abstract', doc.get('text_to_embed', ''))[:250]}...")
+                        st.write(
+                            f"**[{idx+1}] {doc.get('title', 'Sin título')}** (Relevancia:"
+                            f" {doc['rerank_score']*100:.2f}%)"
+                        )
+                        st.caption(
+                            f"{doc.get('abstract', doc.get('text_to_embed', ''))[:250]}..."
+                        )
 
     st.session_state.messages.append({
-        "role": "assistant", 
+        "role": "assistant",
         "content": answer,
-        "sources": retrieved_docs if "El corpus no contiene" not in answer else []
+        "sources": (
+            retrieved_docs if "El corpus no contiene" not in answer else []
+        ),
     })
